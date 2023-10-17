@@ -3,21 +3,22 @@ FV3Dataset:
         - bfg_
         - sfg_
 
-    path_out        : "replay-1deg"
-    zarr_name       : fv3.zarr
-    forecast_hours  : [0, 6]
+    path_out        : "../zstores/replay-1deg"
+    forecast_hours  : [0, 3]
 
     chunks_in:
+        # estimated 37MB per chunk (the full 3D field)
         time        : 1
-        pfull       : 5
-        grid_yt     : -1
-        grid_xt     : -1
+        pfull       : 127
+        grid_yt     : 192
+        grid_xt     : 384
 
     chunks_out:
+        # estimated 2MB per chunk
         time        : 1
-        pfull       : 5
-        grid_yt     : 30
-        grid_xt     : 30
+        pfull       : 127
+        grid_yt     : 64
+        grid_xt     : 64
 
     coords:
         - phalf
@@ -28,13 +29,14 @@ FV3Dataset:
         - bk
 
     data_vars:
+        # 3D atmospheric vars
         - tmp
         - ugrd
         - vgrd
         - dpres
-        - delz
         - spfh
         - o3mr
+        # 3D land vars
         - soilt1
         - soilt2
         - soilt3
@@ -47,10 +49,21 @@ FV3Dataset:
         - soilw2
         - soilw3
         - soilw4
+        # 2D vars
         - snod
         - prateb_ave
         - pressfc
         - weasd
         - f10m
         - sfcr
+        # Surface forcing vars
         - land
+        - vtype
+        - sotyp
+        - veg
+        - icec
+        - tmpsfc
+        # Ease comparison
+        - tmp2m
+        - ugrd2m
+        - vgrd2m
