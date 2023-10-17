@@ -1,0 +1,56 @@
+FV3Dataset:
+    file_prefixes:
+        - bfg_
+        - sfg_
+
+    path_out        : "replay-1deg"
+    zarr_name       : fv3.zarr
+    forecast_hours  : [0, 6]
+
+    chunks_in:
+        time        : 1
+        pfull       : 5
+        grid_yt     : -1
+        grid_xt     : -1
+
+    chunks_out:
+        time        : 1
+        pfull       : 5
+        grid_yt     : 30
+        grid_xt     : 30
+
+    coords:
+        - phalf
+        - pfull
+        - grid_xt
+        - grid_yt
+        - ak
+        - bk
+
+    data_vars:
+        - tmp
+        - ugrd
+        - vgrd
+        - dpres
+        - delz
+        - spfh
+        - o3mr
+        - soilt1
+        - soilt2
+        - soilt3
+        - soilt4
+        - soill1
+        - soill2
+        - soill3
+        - soill4
+        - soilw1
+        - soilw2
+        - soilw3
+        - soilw4
+        - snod
+        - prateb_ave
+        - pressfc
+        - weasd
+        - f10m
+        - sfcr
+        - land
