@@ -64,8 +64,8 @@ FV3Dataset:
         - tmpsfc
         # Ease comparison
         - tmp2m
-        - ugrd2m
-        - vgrd2m
+        - ugrd10m
+        - vgrd10m
         # For cloudy assimilation
         - clwmr
         - grle
