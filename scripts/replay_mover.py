@@ -8,6 +8,9 @@ import xarray as xr
 import dask.array as darray
 from zarr import NestedDirectoryStore
 
+from UFS2ARCO import FV3Dataset
+
+from timer import Timer
 
 class ReplayMover1Degree():
     """
@@ -29,7 +32,7 @@ class ReplayMover1Degree():
     @property
     def xcycles(self):
         cycles = pd.date_range(start="1994-01-01", end="1999-06-13T06:00:00", freq="6h")
-        return xr.DataArray(cycles, coords={"cycles": cycles}, coords="cycles")
+        return xr.DataArray(cycles, coords={"cycles": cycles}, dims="cycles")
 
 
     @property
@@ -50,11 +53,12 @@ class ReplayMover1Degree():
 
 
     def my_cycles(self, job_id):
-        slices = [slice(int(st), int(ed)) for st, ed in zip(self.splits[:-1], splits[1:])]
+        slices = [slice(int(st), int(ed)) for st, ed in zip(self.splits[:-1], self.splits[1:])]
         return self.xcycles.isel(cycles=slices[job_id])
 
 
-    def __init__(self, config_filename, component="fv3"):
+    def __init__(self, n_jobs, config_filename, component="fv3"):
+        self.n_jobs = n_jobs
         self.config_filename = config_filename
 
         with open(config_filename, "r") as f:
@@ -67,34 +71,13 @@ class ReplayMover1Degree():
         assert tuple(self.forecast_hours) == (0, 3)
 
 
-    def path(self, date):
-        """Construct path to 1 degree replay data
 
-        Args:
-            date (datetime): with the DA cycle to grab
-
-        Returns:
-            paths (list of str): with paths to s3 buckets
-        """
-
-        upper = "s3://noaa-ufs-gefsv13replay-pds/1deg"
-        this_dir = f"{date.year:04d}/{date.month:02d}/{date.year:04d}{date.month:02d}{date.day:02d}{date.hour:02d}"
-        files = []
-        for fp in self.file_prefixes:
-            for fhr in self.forecast_hours:
-                files.append(
-                        f"{fp}{date.year:04d}{date.month:02d}{date.day:02d}{date.hour:02d}_fhr{fhr:02d}_control")
-        return [join(upper, this_dir, this_file) for this_file in files]
-
-
-    def cached_path(self, date)
-        return [f"simplecache::{u}" for u in self.path(date)]
 
 
     def run(self, job_id):
         """Make this essentially a function that can run completely independently of other objects"""
 
-        replay = FV3Dataset(path_in=self.path, config_filename=self.config_filename)
+        replay = FV3Dataset(path_in=self.cached_path, config_filename=self.config_filename)
 
         for cycle in self.my_cycles(job_id):
 
@@ -104,7 +87,15 @@ class ReplayMover1Degree():
             indices = np.array([list(self.xtime.values).index(t) for t in xds.time.values])
             tslice = slice(indices.min(), indices.max()+1)
 
-            replay.store_dataset(xds, region={"time": tslice})
+            replay.store_dataset(
+                    xds,
+                    region={
+                        "time": tslice,
+                        "pfull": slice(None, None),
+                        "grid_yt": slice(None, None),
+                        "grid_xt": slice(None, None),
+                        },
+                    )
 
 
     def store_container(self):
@@ -112,10 +103,10 @@ class ReplayMover1Degree():
 
         localtime = Timer()
 
-        replay = FV3Dataset(path_in=self.path, config_filename=self.config_filename)
+        replay = FV3Dataset(path_in=self.cached_path, config_filename=self.config_filename)
 
         localtime.start("Reading Single Dataset")
-        cycle = self.npdate2datetime(self.xcycles.values[0])
+        cycle = self.npdate2datetime(self.xcycles[0])
         xds = replay.open_dataset(cycle, **self.ods_kwargs)
         xds = xds.reset_coords()
         localtime.stop()
@@ -137,7 +128,7 @@ class ReplayMover1Degree():
 
             dims = ("time",) + single[key].dims
             chunks = tuple(replay.chunks_out[k] for k in dims)
-            shape = (len(xtime),) + single[key].shape
+            shape = (len(dds["time"]),) + single[key].shape
 
             dds[key] = xr.DataArray(
                     data=darray.zeros(
@@ -158,16 +149,47 @@ class ReplayMover1Degree():
         dds.to_zarr(store, compute=False)
         localtime.stop()
 
-    return
+    @staticmethod
+    def path(date, forecast_hours, file_prefixes):
+        """Construct path to 1 degree replay data
+
+        Args:
+            date (datetime): with the DA cycle to grab
+
+        Returns:
+            paths (list of str): with paths to s3 buckets
+        """
+
+        upper = "s3://noaa-ufs-gefsv13replay-pds/1deg"
+        this_dir = f"{date.year:04d}/{date.month:02d}/{date.year:04d}{date.month:02d}{date.day:02d}{date.hour:02d}"
+        files = []
+        for fp in file_prefixes:
+            for fhr in forecast_hours:
+                files.append(
+                        f"{fp}{date.year:04d}{date.month:02d}{date.day:02d}{date.hour:02d}_fhr{fhr:02d}_control")
+        return [join(upper, this_dir, this_file) for this_file in files]
+
+
+    @staticmethod
+    def cached_path(date, forecast_hours, file_prefixes):
+        """there has to be a better way to do this"""
+        upper = "simplecache::s3://noaa-ufs-gefsv13replay-pds/1deg"
+        this_dir = f"{date.year:04d}/{date.month:02d}/{date.year:04d}{date.month:02d}{date.day:02d}{date.hour:02d}"
+        files = []
+        for fp in file_prefixes:
+            for fhr in forecast_hours:
+                files.append(
+                        f"{fp}{date.year:04d}{date.month:02d}{date.day:02d}{date.hour:02d}_fhr{fhr:02d}_control")
+        return [join(upper, this_dir, this_file) for this_file in files]
 
 
     @staticmethod
     def npdate2datetime(npdate):
         return datetime(
-                    year=int(cycle.dt.year),
-                    month=int(cycle.dt.month),
-                    day=int(cycle.dt.day),
-                    hour=int(cycle.dt.hour),
+                    year=int(npdate.dt.year),
+                    month=int(npdate.dt.month),
+                    day=int(npdate.dt.day),
+                    hour=int(npdate.dt.hour),
                 )
 
 
@@ -191,8 +213,8 @@ class ReplayMover1Degree():
         """
         ftime = np.array(
                 [
-                    (np.timedelta64(timedelta(hours=-6)), np.timedelta64(timedelta(hours=-3))
-                        for _ in len(self.xtime))
+                    (np.timedelta64(timedelta(hours=-6)), np.timedelta64(timedelta(hours=-3)))
+                        for _ in range(len(xds["time"])//2)
                     ]
                 ).flatten()
 
@@ -218,3 +240,4 @@ class ReplayMover1Degree():
                 )
         xds = xds.set_coords(["ftime", "cftime"])
         return xds
+
