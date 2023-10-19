@@ -14,11 +14,10 @@ FV3Dataset:
         grid_xt     : 384
 
     chunks_out:
-        # estimated 2MB per chunk
         time        : 1
         pfull       : 127
-        grid_yt     : 64
-        grid_xt     : 64
+        grid_yt     : 192
+        grid_xt     : 384
 
     coords:
         - phalf
@@ -67,3 +66,12 @@ FV3Dataset:
         - tmp2m
         - ugrd2m
         - vgrd2m
+        # For cloudy assimilation
+        - clwmr
+        - grle
+        - icmr
+        - rwmr
+        - snmr
+        # For future operational implementation
+        - ntrnc
+        - nicp
