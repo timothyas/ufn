@@ -45,7 +45,7 @@ class ReplayMover1Degree():
     @property
     def splits(self):
         """The indices used to split all cycles across :attr:`n_jobs`"""
-        return np.linspace(0, len(self.xcycles), self.n_jobs)
+        return [int(x) for x in np.linspace(0, len(self.xcycles), self.n_jobs+1)]
 
     @property
     def ods_kwargs(self):
@@ -53,7 +53,7 @@ class ReplayMover1Degree():
 
 
     def my_cycles(self, job_id):
-        slices = [slice(int(st), int(ed)) for st, ed in zip(self.splits[:-1], self.splits[1:])]
+        slices = [slice(st, ed) for st, ed in zip(self.splits[:-1], self.splits[1:])]
         return self.xcycles.isel(cycles=slices[job_id])
 
 
@@ -69,9 +69,6 @@ class ReplayMover1Degree():
         self.file_prefixes = config[name]["file_prefixes"]
 
         assert tuple(self.forecast_hours) == (0, 3)
-
-
-
 
 
     def run(self, job_id):
