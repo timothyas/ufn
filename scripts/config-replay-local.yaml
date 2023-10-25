@@ -3,7 +3,7 @@ FV3Dataset:
         - bfg_
         - sfg_
 
-    path_out        : "../zstores/local-replay-1deg"
+    path_out        : "../zstores/local-replay-1deg-slurmtest"
     forecast_hours  : [0, 3]
 
     chunks_in:

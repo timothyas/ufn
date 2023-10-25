@@ -142,7 +142,7 @@ class ReplayMover1Degree():
         localtime.stop()
 
         localtime.start("Storing to zarr")
-        store = NestedDirectoryStore(path=replay.forecast_path)
+        store = NestedDirectoryStore(path=replay.data_path)
         dds.to_zarr(store, compute=False)
         localtime.stop()
 
