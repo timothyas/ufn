@@ -16,6 +16,8 @@ if __name__ == "__main__":
     localtime.stop()
 
     localtime.start("writing to bucket")
+    bucket = "noaa-ufs-gefsv13replay"
+    test_dir = f"gcs://{bucket}/ufs-hr1/1.00-degree/03h-freq/test-zarr"
     ds.to_zarr(
             f"gcs://{test_dir}/fv3.zarr",
             storage_options={
