@@ -41,28 +41,19 @@ if __name__ == "__main__":
     walltime.start("Initializing job")
 
     # start with many jobs to just write a single slice of time steps for verification
-    mover = ReplayMover1Degree(n_jobs=4, config_filename="config-replay.yaml")
+    mover = ReplayMover1Degree(
+            n_jobs=24,
+            config_filename="config-replay-gcs.yaml",
+            storage_options={"token": "/contrib/Tim.Smith/.gcs/replay-service-account.json"},
+            )
 
-    #localtime.start("Make and Store Container Dataset")
-    #mover.store_container()
-    #localtime.stop()
+    localtime.start("Make and Store Container Dataset")
+    mover.store_container()
+    localtime.stop()
 
     localtime.start("Run slurm jobs")
     for job_id in range(mover.n_jobs):
         submit_slurm_mover(job_id, mover.n_jobs)
     localtime.stop()
-
-    ## for verification
-    #mover = ReplayMover1Degree(n_jobs=4, config_filename="config-replay-local.yaml")
-
-    #localtime.start("Make and Store Container Dataset")
-    #mover.store_container()
-    #localtime.stop()
-
-    #localtime.start("Run local jobs")
-    #for job_id in range(mover.n_jobs):
-    #    mover.run(job_id)
-
-    #localtime.stop()
 
     walltime.stop()

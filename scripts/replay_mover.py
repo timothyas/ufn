@@ -57,9 +57,10 @@ class ReplayMover1Degree():
         return self.xcycles.isel(cycles=slices[job_id])
 
 
-    def __init__(self, n_jobs, config_filename, component="fv3"):
+    def __init__(self, n_jobs, config_filename, component="fv3", storage_options=None):
         self.n_jobs = n_jobs
         self.config_filename = config_filename
+        self.storage_options = storage_options if storage_options is not None else dict()
 
         with open(config_filename, "r") as f:
             config = yaml.safe_load(f)
@@ -72,10 +73,17 @@ class ReplayMover1Degree():
 
 
     def run(self, job_id):
-        """Make this essentially a function that can run completely independently of other objects"""
+        """Make this essentially a function that can run completely independently of other objects
+
+        Note:
+            This could probably be more efficient by creating a list of cycles and passing that to open_dataset,
+            rather than going one cycle at a time. However, since we are pulling datasets to local cache and
+            I'll be running many jobs concurrently, it could be best to just do it this way.
+        """
 
         replay = FV3Dataset(path_in=self.cached_path, config_filename=self.config_filename)
 
+        store_coords = job_id == 0
         for cycle in self.my_cycles(job_id):
 
             cycle_date = self.npdate2datetime(cycle)
@@ -86,13 +94,17 @@ class ReplayMover1Degree():
 
             replay.store_dataset(
                     xds,
+                    store_coords=store_coords,
+                    coords_kwargs={"storage_options": self.storage_options},
                     region={
                         "time": tslice,
                         "pfull": slice(None, None),
                         "grid_yt": slice(None, None),
                         "grid_xt": slice(None, None),
                         },
+                    storage_options=self.storage_options,
                     )
+            store_coords = False
 
 
     def store_container(self):
@@ -143,7 +155,7 @@ class ReplayMover1Degree():
 
         localtime.start("Storing to zarr")
         store = NestedDirectoryStore(path=replay.data_path) if replay.is_nested else replay.data_path
-        dds.to_zarr(store, compute=False)
+        dds.to_zarr(store, compute=False, storage_options=self.storage_options)
         localtime.stop()
 
     @staticmethod
