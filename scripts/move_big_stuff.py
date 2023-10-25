@@ -11,7 +11,7 @@ from replay_mover import ReplayMover1Degree
 from timer import Timer
 
 
-def submit_slurm_mover(job_id, n_jobs):
+def submit_slurm_mover(job_id, n_jobs, config_filename, storage_options):
 
     txt = "#!/bin/bash\n\n" +\
         f"#SBATCH -J mover{job_id:02d}\n"+\
@@ -24,7 +24,7 @@ def submit_slurm_mover(job_id, n_jobs):
         f"#SBATCH -t 120:00:00\n\n"+\
         f"source /contrib/Tim.Smith/miniconda3/etc/profile.d/conda.sh\n"+\
         f"conda activate ufs2arco\n"+\
-        f"python -c 'from replay_mover import ReplayMover1Degree; mover = ReplayMover1Degree(n_jobs={n_jobs}, config_filename=\"config-replay.yaml\") ; mover.run({job_id})'\n"
+        f'python -c "from replay_mover import ReplayMover1Degree; mover = ReplayMover1Degree(n_jobs={n_jobs}, config_filename=\'{config_filename}\', storage_options={storage_options}) ; mover.run({job_id})"\n'
 
     fname = f"submit_mover{job_id:02d}.sh"
     with open(fname, "w") as f:
@@ -48,12 +48,12 @@ if __name__ == "__main__":
             )
 
     localtime.start("Make and Store Container Dataset")
-    mover.store_container()
+    #mover.store_container()
     localtime.stop()
 
     localtime.start("Run slurm jobs")
     for job_id in range(mover.n_jobs):
-        submit_slurm_mover(job_id, mover.n_jobs)
+        submit_slurm_mover(job_id, mover.n_jobs, mover.config_filename, mover.storage_options)
     localtime.stop()
 
     walltime.stop()
