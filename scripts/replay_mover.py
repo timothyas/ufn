@@ -28,7 +28,7 @@ class ReplayMover1Degree():
 
 
     n_jobs = None
-    n_cycles = 12 # with two fhr files, about 16GB
+    n_cycles = 60 # with two fhr files, about 18 x2 GB cache storage / job
 
     forecast_hours = None
     file_prefixes = None
@@ -52,7 +52,7 @@ class ReplayMover1Degree():
         return [int(x) for x in np.linspace(0, len(self.xcycles), self.n_jobs+1)]
 
     def cache_storage(self, job_id):
-        return f"/contrib/Tim.Smith/tmp/files/{job_id}"
+        return f"/contrib/Tim.Smith/tmp-replay/1.00-degree/{job_id}"
 
     def ods_kwargs(self, job_id):
         okw = {
@@ -266,6 +266,44 @@ class ReplayMover1Degree():
                 )
         xds = xds.set_coords(["ftime", "cftime"])
         return xds
+
+
+class ReplayMoverQuarterDegree(ReplayMover1Degree):
+
+    n_cycles = 4 # with two fhr files, about 16 x2 GB cache storage / job
+
+    @property
+    def xcycles(self):
+        cycles = pd.date_range(start="1994-01-01", end="1995-01-01T00:00:00", freq="6h")
+        return xr.DataArray(cycles, coords={"cycles": cycles}, dims="cycles")
+
+
+    @property
+    def xtime(self):
+        time = pd.date_range(start="1994-01-01", end="1995-01-01T03:00:00", freq="3h")
+        iau_time = time - timedelta(hours=6)
+        return xr.DataArray(iau_time, coords={"time": iau_time}, dims="time", attrs={"long_name": "time", "axis": "T"})
+
+    def cache_storage(self, job_id):
+        return f"/contrib/Tim.Smith/tmp-replay/0.25-degree/{job_id}"
+
+    @staticmethod
+    def cached_path(dates, forecast_hours, file_prefixes):
+        """Note, with simplecache it's not clear where the cached files go, and they
+        do not clear until the process is done running (maybe?) which can file up a filesystem easily.
+        """
+
+        upper = "filecache::s3://noaa-ufs-gefsv13replay-pds"
+        dates = [dates] if not isinstance(dates, Iterable) else dates
+
+        files = []
+        for date in dates:
+            this_dir = f"{date.year:04d}/{date.month:02d}/{date.year:04d}{date.month:02d}{date.day:02d}{date.hour:02d}"
+            for fp in file_prefixes:
+                for fhr in forecast_hours:
+                    this_file = join(this_dir, f"{fp}{date.year:04d}{date.month:02d}{date.day:02d}{date.hour:02d}_fhr{fhr:02d}_control")
+                    files.append(this_file)
+        return [join(upper, this_file) for this_file in files]
 
 
 def batched(iterable, n):
