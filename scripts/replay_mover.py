@@ -28,7 +28,7 @@ class ReplayMover1Degree():
 
 
     n_jobs = None
-    n_cycles = 30
+    n_cycles = 12 # with two fhr files, about 16GB
 
     forecast_hours = None
     file_prefixes = None
@@ -121,8 +121,11 @@ class ReplayMover1Degree():
                     storage_options=self.storage_options,
                     )
             store_coords = False
+
+            # This is a hacky way to clear the cache, since we don't create a filesystem object
+            del xds
             if isdir(self.cache_storage(job_id)):
-                rmtree(self.cache_storage(job_id))
+                rmtree(self.cache_storage(job_id), ignore_errors=True)
             localtime.stop()
 
 
@@ -180,8 +183,11 @@ class ReplayMover1Degree():
 
     @staticmethod
     def cached_path(dates, forecast_hours, file_prefixes):
+        """Note, with simplecache it's not clear where the cached files go, and they
+        do not clear until the process is done running (maybe?) which can file up a filesystem easily.
+        """
 
-        upper = "simplecache::s3://noaa-ufs-gefsv13replay-pds/1deg"
+        upper = "filecache::s3://noaa-ufs-gefsv13replay-pds/1deg"
         dates = [dates] if not isinstance(dates, Iterable) else dates
 
         files = []
