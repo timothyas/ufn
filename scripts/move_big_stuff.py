@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     # start with many jobs to just write a single slice of time steps for verification
     mover = ReplayMover1Degree(
-            n_jobs=24,
+            n_jobs=12,
             config_filename="config-replay-gcs.yaml",
             storage_options={"token": "/contrib/Tim.Smith/.gcs/replay-service-account.json"},
             )

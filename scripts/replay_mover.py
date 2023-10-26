@@ -1,6 +1,9 @@
-from os.path import join
+from os.path import join, isdir
 from datetime import datetime, timedelta
 import yaml
+from shutil import rmtree
+import itertools
+from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
@@ -25,6 +28,7 @@ class ReplayMover1Degree():
 
 
     n_jobs = None
+    n_cycles = 30
 
     forecast_hours = None
     file_prefixes = None
@@ -47,14 +51,25 @@ class ReplayMover1Degree():
         """The indices used to split all cycles across :attr:`n_jobs`"""
         return [int(x) for x in np.linspace(0, len(self.xcycles), self.n_jobs+1)]
 
-    @property
-    def ods_kwargs(self):
-        return {"fsspec_kwargs": {"s3": {"anon": True}}, "engine":"h5netcdf"}
+    def cache_storage(self, job_id):
+        return f"/contrib/Tim.Smith/tmp/files/{job_id}"
+
+    def ods_kwargs(self, job_id):
+        okw = {
+            "fsspec_kwargs": {
+                "s3": {"anon": True},
+                "filecache": {"cache_storage": self.cache_storage(job_id)},
+            },
+            "engine":"h5netcdf"
+        }
+        return okw
 
 
     def my_cycles(self, job_id):
         slices = [slice(st, ed) for st, ed in zip(self.splits[:-1], self.splits[1:])]
-        return self.xcycles.isel(cycles=slices[job_id])
+        xda = self.xcycles.isel(cycles=slices[job_id])
+        cycles_datetime = self.npdate2datetime(xda)
+        return cycles_datetime
 
 
     def __init__(self, n_jobs, config_filename, component="fv3", storage_options=None):
@@ -81,13 +96,14 @@ class ReplayMover1Degree():
             I'll be running many jobs concurrently, it could be best to just do it this way.
         """
 
+        localtime = Timer()
         replay = FV3Dataset(path_in=self.cached_path, config_filename=self.config_filename)
 
-        store_coords = job_id == 0
-        for cycle in self.my_cycles(job_id):
+        store_coords = False#job_id == 0
+        for cycles in list(batched(self.my_cycles(job_id), self.n_cycles)):
 
-            cycle_date = self.npdate2datetime(cycle)
-            xds = replay.open_dataset(cycle_date, **self.ods_kwargs)
+            localtime.start(f"Reading {str(cycles[0])} - {str(cycles[-1])}")
+            xds = replay.open_dataset(list(cycles), **self.ods_kwargs(job_id))
 
             indices = np.array([list(self.xtime.values).index(t) for t in xds.time.values])
             tslice = slice(indices.min(), indices.max()+1)
@@ -105,6 +121,9 @@ class ReplayMover1Degree():
                     storage_options=self.storage_options,
                     )
             store_coords = False
+            if isdir(self.cache_storage(job_id)):
+                rmtree(self.cache_storage(job_id))
+            localtime.stop()
 
 
     def store_container(self):
@@ -116,7 +135,7 @@ class ReplayMover1Degree():
 
         localtime.start("Reading Single Dataset")
         cycle = self.npdate2datetime(self.xcycles[0])
-        xds = replay.open_dataset(cycle, **self.ods_kwargs)
+        xds = replay.open_dataset(cycle, **self.ods_kwargs(0))
         xds = xds.reset_coords()
         localtime.stop()
 
@@ -158,48 +177,40 @@ class ReplayMover1Degree():
         dds.to_zarr(store, compute=False, storage_options=self.storage_options)
         localtime.stop()
 
-    @staticmethod
-    def path(date, forecast_hours, file_prefixes):
-        """Construct path to 1 degree replay data
-
-        Args:
-            date (datetime): with the DA cycle to grab
-
-        Returns:
-            paths (list of str): with paths to s3 buckets
-        """
-
-        upper = "s3://noaa-ufs-gefsv13replay-pds/1deg"
-        this_dir = f"{date.year:04d}/{date.month:02d}/{date.year:04d}{date.month:02d}{date.day:02d}{date.hour:02d}"
-        files = []
-        for fp in file_prefixes:
-            for fhr in forecast_hours:
-                files.append(
-                        f"{fp}{date.year:04d}{date.month:02d}{date.day:02d}{date.hour:02d}_fhr{fhr:02d}_control")
-        return [join(upper, this_dir, this_file) for this_file in files]
-
 
     @staticmethod
-    def cached_path(date, forecast_hours, file_prefixes):
-        """there has to be a better way to do this"""
+    def cached_path(dates, forecast_hours, file_prefixes):
+
         upper = "simplecache::s3://noaa-ufs-gefsv13replay-pds/1deg"
-        this_dir = f"{date.year:04d}/{date.month:02d}/{date.year:04d}{date.month:02d}{date.day:02d}{date.hour:02d}"
+        dates = [dates] if not isinstance(dates, Iterable) else dates
+
         files = []
-        for fp in file_prefixes:
-            for fhr in forecast_hours:
-                files.append(
-                        f"{fp}{date.year:04d}{date.month:02d}{date.day:02d}{date.hour:02d}_fhr{fhr:02d}_control")
-        return [join(upper, this_dir, this_file) for this_file in files]
+        for date in dates:
+            this_dir = f"{date.year:04d}/{date.month:02d}/{date.year:04d}{date.month:02d}{date.day:02d}{date.hour:02d}"
+            for fp in file_prefixes:
+                for fhr in forecast_hours:
+                    this_file = join(this_dir, f"{fp}{date.year:04d}{date.month:02d}{date.day:02d}{date.hour:02d}_fhr{fhr:02d}_control")
+                    files.append(this_file)
+        return [join(upper, this_file) for this_file in files]
 
 
     @staticmethod
     def npdate2datetime(npdate):
-        return datetime(
+        if not isinstance(npdate, Iterable):
+            return datetime(
                     year=int(npdate.dt.year),
                     month=int(npdate.dt.month),
                     day=int(npdate.dt.day),
                     hour=int(npdate.dt.hour),
                 )
+        else:
+            return [datetime(
+                    year=int(t.dt.year),
+                    month=int(t.dt.month),
+                    day=int(t.dt.day),
+                    hour=int(t.dt.hour),
+                )
+                for t in npdate]
 
 
     @staticmethod
@@ -250,3 +261,11 @@ class ReplayMover1Degree():
         xds = xds.set_coords(["ftime", "cftime"])
         return xds
 
+
+def batched(iterable, n):
+    # batched('ABCDEFG', 3) --> ABC DEF G
+    if n < 1:
+        raise ValueError('n must be at least one')
+    it = iter(iterable)
+    while batch := tuple(itertools.islice(it, n)):
+        yield batch
