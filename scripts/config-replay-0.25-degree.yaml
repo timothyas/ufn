@@ -3,7 +3,7 @@ FV3Dataset:
         - bfg_
         - sfg_
 
-    path_out       : "gcs://noaa-ufs-gefsv13replay/ufs-hr1/0.25-degree/03h-freq/zarr/"
+    path_out       : "gcs://noaa-ufs-gefsv13replay/ufs-hr1/0.25-degree/03h-freq/zarr-1year/"
     coords_path_out: "gcs://noaa-ufs-gefsv13replay/ufs-hr1/0.25-degree/coordinates/zarr/"
     forecast_hours  : [0, 3]
 

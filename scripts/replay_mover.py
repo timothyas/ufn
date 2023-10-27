@@ -99,7 +99,7 @@ class ReplayMover1Degree():
         localtime = Timer()
         replay = FV3Dataset(path_in=self.cached_path, config_filename=self.config_filename)
 
-        store_coords = False#job_id == 0
+        store_coords = job_id == 0
         for cycles in list(batched(self.my_cycles(job_id), self.n_cycles)):
 
             localtime.start(f"Reading {str(cycles[0])} - {str(cycles[-1])}")
@@ -137,7 +137,7 @@ class ReplayMover1Degree():
         replay = FV3Dataset(path_in=self.cached_path, config_filename=self.config_filename)
 
         localtime.start("Reading Single Dataset")
-        cycle = self.npdate2datetime(self.xcycles[0])
+        cycle = self.my_cycles(0)[0]
         xds = replay.open_dataset(cycle, **self.ods_kwargs(0))
         xds = xds.reset_coords()
         localtime.stop()
