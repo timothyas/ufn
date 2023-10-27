@@ -1,40 +1,42 @@
+"""A basic script to pull datasets from s3"""
 
-from os.path import join
-import datetime
-import fsspec
-import xarray as xr
-import time
+from datetime import datetime
+from shutil import rmtree
 
 from UFS2ARCO import FV3Dataset
+from UFS2ARCO.replay import cached_replay_path_1degree as replay_path
 
-def replay_path(date: datetime.datetime, fhrs: list, file_prefixes: list):
-
-    upper = "s3://noaa-ufs-gefsv13replay-pds/1deg"
-    this_dir = f"{date.year:04d}/{date.month:02d}/{date.year:04d}{date.month:02d}{date.day:02d}{date.hour:02d}"
-    files = []
-    for fp in file_prefixes:
-        for fhr in fhrs:
-            files.append(
-                    f"{fp}{date.year:04d}{date.month:02d}{date.day:02d}{date.hour:02d}_fhr{fhr:02d}_control")
-    return [join(upper, this_dir, this_file) for this_file in files]
-
-
-def cached_path(date: datetime.datetime, fhrs: list, file_prefixes: list):
-    return [f"simplecache::{u}" for u in replay_path(date, fhrs, file_prefixes)]
-
+from timer import Timer
 
 if __name__ == "__main__":
 
-    t0 = time.perf_counter()
-    replay = FV3Dataset(path_in=cached_path, config_filename="config-replay.yaml")
+    walltime = Timer()
+    localtime = Timer()
 
+    walltime.start("Initializing job")
+
+    replay = FV3Dataset(path_in=replay_path, config_filename="config-replay.yaml")
     kw = {"mode": "w"}
-    for hour in [0, 6]:
-        date = datetime.datetime(year=1994, month=1, day=1, hour=hour)
-        ds = replay.open_dataset(date, fsspec_kwargs={"s3":{"anon": True}}, engine="h5netcdf")
-        replay.store_dataset(ds, **kw)
-        kw = {"mode": "a", "append_dim":"time"}
-        print("stored hour ", hour)
+    year = 1994
+    month = 2
+    for day in range(28,30):
+        for hour in [0, 6, 12, 18]:
 
-    dt = time.perf_counter() - t0
-    print(f"total time:  {dt:.4f} seconds")
+            try:
+                date = datetime(year=year, month=month, day=day, hour=hour)
+                valid_time = True
+
+            except ValueError:
+
+                # this should only happen when we ask for an invalid date, like Feb 30
+                valid_time = False
+                print(f" ... skipping year={year}, month={month}, day={day}, hour={hour}")
+
+            if valid_time:
+                localtime.start(f"Pulling {str(date)}")
+                ds = replay.open_dataset(date, fsspec_kwargs={"s3":{"anon": True}}, engine="h5netcdf")
+                replay.store_dataset(ds, **kw)
+                kw = {"mode": "a", "append_dim":"time"}
+                localtime.stop()
+
+    walltime.stop("Total Walltime")

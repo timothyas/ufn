@@ -3,24 +3,22 @@ FV3Dataset:
         - bfg_
         - sfg_
 
-    path_out        : "../zstores/ufs-hr1/1.00-degree/03h-freq/zarr"
-    coords_path_out : "../zstores/ufs-hr1/1.00-degree/coordinates/zarr"
-    #path_out       : "gcs://ufs-gefsv13replay/ufs-hr1/1.00-degree/03h-freq/zarr/"
-    #coords_path_out: "gcs://ufs-gefsv13replay/ufs-hr1/1.00-degree/coordinates/zarr/"
+    path_out       : "gcs://noaa-ufs-gefsv13replay/ufs-hr1/0.25-degree/03h-freq/zarr-1year/"
+    coords_path_out: "gcs://noaa-ufs-gefsv13replay/ufs-hr1/0.25-degree/coordinates/zarr/"
     forecast_hours  : [0, 3]
 
     chunks_in:
         # estimated 37MB per chunk (the full 3D field)
         time        : 1
         pfull       : 127
-        grid_yt     : 192
-        grid_xt     : 384
+        grid_yt     : 768
+        grid_xt     : 1536
 
     chunks_out:
         time        : 1
         pfull       : 127
-        grid_yt     : 192
-        grid_xt     : 384
+        grid_yt     : 768
+        grid_xt     : 1536
 
     coords:
         - phalf

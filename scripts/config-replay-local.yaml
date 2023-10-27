@@ -3,10 +3,7 @@ FV3Dataset:
         - bfg_
         - sfg_
 
-    path_out        : "../zstores/ufs-hr1/1.00-degree/03h-freq/zarr"
-    coords_path_out : "../zstores/ufs-hr1/1.00-degree/coordinates/zarr"
-    #path_out       : "gcs://ufs-gefsv13replay/ufs-hr1/1.00-degree/03h-freq/zarr/"
-    #coords_path_out: "gcs://ufs-gefsv13replay/ufs-hr1/1.00-degree/coordinates/zarr/"
+    path_out        : "../zstores/local-replay-1deg-slurmtest"
     forecast_hours  : [0, 3]
 
     chunks_in:
