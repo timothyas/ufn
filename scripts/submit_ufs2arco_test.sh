@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#SBATCH -J first_jan_threads
-#SBATCH -o slurm/first_jan_threads.%j.out
-#SBATCH -e slurm/first_jan_threads.%j.err
+#SBATCH -J test_ufs2arco
+#SBATCH -o slurm/test_ufs2arco.%j.out
+#SBATCH -e slurm/test_ufs2arco.%j.err
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=30
