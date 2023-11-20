@@ -30,15 +30,12 @@ dependencies:
     - jraph
     - pandas
     - rtree
-      # - tree I think this one is not necessary
     - dm-tree
     - trimesh
     - typing_extensions
     - google-api-python-client
     - pip
-# my additions
-    - tmux
-    - colordiff
-    - jupyterlab_vim
-    #- pip:
-    #    - https://github.com/deepmind/graphcast/archive/master.zip
+# Don't pull graphcast since we fork it and develop it
+#    - pip
+#    - pip:
+#        - https://github.com/deepmind/graphcast/archive/master.zip
