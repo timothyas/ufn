@@ -6,7 +6,7 @@ So, this is easy enough to just submit separate slurm jobs that work on their ow
 
 import subprocess
 
-from UFS2ARCO import FV3Dataset
+from ufs2arco import FV3Dataset
 from replay_mover import ReplayMoverQuarterDegree
 from timer import Timer
 

@@ -11,7 +11,7 @@ import xarray as xr
 import dask.array as darray
 from zarr import NestedDirectoryStore
 
-from UFS2ARCO import FV3Dataset
+from ufs2arco import FV3Dataset
 
 from timer import Timer
 
