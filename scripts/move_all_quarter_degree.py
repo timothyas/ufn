@@ -26,9 +26,9 @@ def submit_slurm_mover(job_id, mover):
         f"mover.run({job_id})"
 
     txt = "#!/bin/bash\n\n" +\
-        f"#SBATCH -J all_quarter_mover{job_id:02d}\n"+\
-        f"#SBATCH -o slurm/all_quarter_mover{job_id:02d}.%j.out\n"+\
-        f"#SBATCH -e slurm/all_quarter_mover{job_id:02d}.%j.err\n"+\
+        f"#SBATCH -J qrm{job_id:03d}\n"+\
+        f"#SBATCH -o slurm/all_quarter_mover/{job_id:03d}.%j.out\n"+\
+        f"#SBATCH -e slurm/all_quarter_mover/{job_id:03d}.%j.err\n"+\
         f"#SBATCH --nodes=1\n"+\
         f"#SBATCH --ntasks=1\n"+\
         f"#SBATCH --cpus-per-task=30\n"+\
@@ -38,8 +38,8 @@ def submit_slurm_mover(job_id, mover):
         f"conda activate ufs2arco\n"+\
         f'python -c "{the_code}"'
 
-    script_dir = "scripts"
-    fname = f"{script_dir}/submit_qmover{job_id:02d}.sh"
+    script_dir = "job-scripts"
+    fname = f"{script_dir}/submit_qmover{job_id:03d}.sh"
     if not os.path.isdir(script_dir):
         os.makedirs(script_dir)
 
