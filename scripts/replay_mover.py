@@ -109,7 +109,7 @@ class ReplayMover1Degree():
         localtime = Timer()
         replay = FV3Dataset(path_in=self.cached_path, config_filename=self.config_filename)
 
-        store_coords = job_id == 0
+        store_coords = False
         for cycles in list(batched(self.my_cycles(job_id), self.n_cycles)):
 
             localtime.start(f"Reading {str(cycles[0])} - {str(cycles[-1])}")
@@ -189,6 +189,12 @@ class ReplayMover1Degree():
         store = NestedDirectoryStore(path=replay.data_path) if replay.is_nested else replay.data_path
         dds.to_zarr(store, compute=False, storage_options=self.storage_options)
         localtime.stop()
+
+        # This is a hacky way to clear the cache, since we don't create a filesystem object
+        del xds
+        if isdir(self.cache_storage(0)):
+            rmtree(self.cache_storage(0), ignore_errors=True)
+
 
 
     @staticmethod
