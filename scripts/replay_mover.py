@@ -309,6 +309,7 @@ class ReplayMoverQuarterDegree(ReplayMover1Degree):
     ):
         super().__init__(
             n_jobs=n_jobs,
+            n_cycles=n_cycles,
             config_filename=config_filename,
             component=component,
             storage_options=storage_options,
