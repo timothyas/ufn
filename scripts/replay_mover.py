@@ -11,7 +11,7 @@ import xarray as xr
 import dask.array as darray
 from zarr import NestedDirectoryStore
 
-from UFS2ARCO import FV3Dataset
+from ufs2arco import FV3Dataset
 
 from timer import Timer
 
@@ -28,7 +28,7 @@ class ReplayMover1Degree():
 
 
     n_jobs = None
-    n_cycles = 60 # with two fhr files, about 18 x2 GB cache storage / job
+    n_cycles = None
 
     forecast_hours = None
     file_prefixes = None
@@ -52,7 +52,7 @@ class ReplayMover1Degree():
         return [int(x) for x in np.linspace(0, len(self.xcycles), self.n_jobs+1)]
 
     def cache_storage(self, job_id):
-        return f"/contrib/Tim.Smith/tmp-replay/1.00-degree/{job_id}"
+        return f"{self.main_cache_path}/{job_id}"
 
     def ods_kwargs(self, job_id):
         okw = {
@@ -72,10 +72,20 @@ class ReplayMover1Degree():
         return cycles_datetime
 
 
-    def __init__(self, n_jobs, config_filename, component="fv3", storage_options=None):
+    def __init__(
+        self,
+        n_jobs,
+        config_filename,
+        n_cycles=60, # with two fhr files, about 18 x2 GB cache storage / job
+        component="fv3",
+        storage_options=None,
+        main_cache_path=f"/contrib/Tim.Smith/tmp-replay/1.00-degree",
+    ):
         self.n_jobs = n_jobs
+        self.n_cycles = n_cycles
         self.config_filename = config_filename
         self.storage_options = storage_options if storage_options is not None else dict()
+        self.main_cache_path = main_cache_path
 
         with open(config_filename, "r") as f:
             config = yaml.safe_load(f)
@@ -99,7 +109,7 @@ class ReplayMover1Degree():
         localtime = Timer()
         replay = FV3Dataset(path_in=self.cached_path, config_filename=self.config_filename)
 
-        store_coords = job_id == 0
+        store_coords = False
         for cycles in list(batched(self.my_cycles(job_id), self.n_cycles)):
 
             localtime.start(f"Reading {str(cycles[0])} - {str(cycles[-1])}")
@@ -179,6 +189,12 @@ class ReplayMover1Degree():
         store = NestedDirectoryStore(path=replay.data_path) if replay.is_nested else replay.data_path
         dds.to_zarr(store, compute=False, storage_options=self.storage_options)
         localtime.stop()
+
+        # This is a hacky way to clear the cache, since we don't create a filesystem object
+        del xds
+        if isdir(self.cache_storage(0)):
+            rmtree(self.cache_storage(0), ignore_errors=True)
+
 
 
     @staticmethod
@@ -270,22 +286,35 @@ class ReplayMover1Degree():
 
 class ReplayMoverQuarterDegree(ReplayMover1Degree):
 
-    n_cycles = 4 # with two fhr files, about 16 x2 GB cache storage / job
-
     @property
     def xcycles(self):
-        cycles = pd.date_range(start="1994-01-01", end="1995-01-01T00:00:00", freq="6h")
+        cycles = pd.date_range(start="1994-01-01", end="2023-10-13T06:00:00", freq="6h")
         return xr.DataArray(cycles, coords={"cycles": cycles}, dims="cycles")
 
 
     @property
     def xtime(self):
-        time = pd.date_range(start="1994-01-01", end="1995-01-01T03:00:00", freq="3h")
+        time = pd.date_range(start="1994-01-01", end="2023-10-13T09:00:00", freq="3h")
         iau_time = time - timedelta(hours=6)
         return xr.DataArray(iau_time, coords={"time": iau_time}, dims="time", attrs={"long_name": "time", "axis": "T"})
 
-    def cache_storage(self, job_id):
-        return f"/contrib/Tim.Smith/tmp-replay/0.25-degree/{job_id}"
+    def __init__(
+        self,
+        n_jobs,
+        config_filename,
+        n_cycles=4, # with two fhr files, about 16 x2 GB cache storage / job
+        component="fv3",
+        storage_options=None,
+        main_cache_path=f"/contrib/Tim.Smith/tmp-replay/0.25-degree",
+    ):
+        super().__init__(
+            n_jobs=n_jobs,
+            n_cycles=n_cycles,
+            config_filename=config_filename,
+            component=component,
+            storage_options=storage_options,
+            main_cache_path=main_cache_path,
+        )
 
     @staticmethod
     def cached_path(dates, forecast_hours, file_prefixes):
