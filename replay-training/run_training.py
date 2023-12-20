@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
     localtime.start("Starting Optimization")
 
-    loss, grads = optimize(
+    params, loss, diagnostics, opt_state, grads = optimize(
         params=params,
         state=state,
         optimizer=optimizer,
@@ -67,7 +67,6 @@ if __name__ == "__main__":
         target_batches=targets,
         forcing_batches=forcings,
     )
-    print("loss: ", loss)
 
     localtime.stop()
 

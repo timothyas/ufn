@@ -19,7 +19,8 @@ See the last few methods and lines of simple_emulatory.py, following this guidan
 """
 
 from functools import partial
-from jax import jit, value_and_grad
+import numpy as np
+from jax import jit, value_and_grad, tree_util
 from jax.random import PRNGKey
 import optax
 import haiku as hk
@@ -89,28 +90,30 @@ def grads_fn(params, state, emulator, inputs, targets, forcings):
     return loss, diagnostics, next_state, grads
 
 
-def optim_step(params, state, emulator, inputs, targets, forcings):
-    def _aux(params, state, i, t, f):
-        (loss, diagnostics), next_state = loss_fn.apply(
-            params, state, PRNGKey(emulator.grad_rng_seed), emulator, i, t, f
-        )
-        return loss, (diagnostics, next_state)
-
-    (loss, (diagnostics, next_state)), grads = value_and_grad(_aux, has_aux=True)(
-        params,
-        state,
-        inputs,
-        targets,
-        forcings,
-    )
-    updates, state = optimizer.update(grads, state, params)
-    params = optax.apply_updates(params, updates)
-    return params, loss, diagnostics, state, grads
-
-
 def optimize(params, state, optimizer, emulator, input_batches, target_batches, forcing_batches):
 
     opt_state = optimizer.init(params)
+
+    def optim_step(params, state, opt_state, emulator, inputs, targets, forcings):
+        """Note that this has to be definied within optimize so that we do not
+        pass optimizer as an argument. Otherwise we get some craazy jax errors"""
+
+        def _aux(params, state, i, t, f):
+            (loss, diagnostics), next_state = loss_fn.apply(
+                params, state, PRNGKey(0), emulator, i, t, f
+            )
+            return loss, (diagnostics, next_state)
+
+        (loss, (diagnostics, next_state)), grads = value_and_grad(_aux, has_aux=True)(
+            params,
+            state,
+            inputs,
+            targets,
+            forcings,
+        )
+        updates, opt_state = optimizer.update(grads, opt_state, params)
+        params = optax.apply_updates(params, updates)
+        return params, loss, diagnostics, opt_state, grads
 
     def with_params(fn):
         return partial(fn, params=params, state=state)
@@ -119,32 +122,19 @@ def optimize(params, state, optimizer, emulator, input_batches, target_batches, 
         optim_step
     ) )
 
-    print(" ... done jitting optim_step")
+    for i in input_batches["batch"].values:
 
-    grads_jitted = with_params( jit(
-        grads_fn
-    ) )
+        params, loss, diagnostics, opt_state, grads = optim_step_jitted(
+            opt_state=opt_state,
+            emulator=emulator,
+            inputs=input_batches.sel(batch=[i]),
+            targets=target_batches.sel(batch=[i]),
+            forcings=forcing_batches.sel(batch=[i]),
+        )
+        mean_grad = np.mean(tree_util.tree_flatten(tree_util.tree_map(lambda x: np.abs(x).mean(), grads))[0])
+        print(f"Step = {i}, loss = {loss}, mean(|grad|) = {mean_grad}")
+        print("diagnostics: ")
+        print(diagnostics)
+        print()
 
-    print(" ... done jitting grads_fn")
-
-    loss, diagnostics, next_state, grads = grads_jitted(
-        emulator=emulator,
-        inputs=input_batches.sel(batch=[0]),
-        targets=target_batches.sel(batch=[0]),
-        forcings=forcing_batches.sel(batch=[0]),
-    )
-    return loss, grads
-
-
-
-    #for i in input_batches["batch"].values:
-
-    #    params, loss, diagnostics, opt_state, grads = optim_step_jitted(
-    #        emulator=emulator,
-    #        inputs=input_batches.sel(batch=[i]),
-    #        targets=target_batches.sel(batch=[i]),
-    #        forcings=forcing_batches.sel(batch=[i]),
-    #    )
-    #    print(f"Step = {i}, loss = {loss}")
-
-    #return params, loss, diagnostics, opt_state, grads
+    return params, loss, diagnostics, opt_state, grads
