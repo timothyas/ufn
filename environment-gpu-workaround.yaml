@@ -1,5 +1,6 @@
-name: gufs-cpu-w
+name: gufs-gpu-w
 channels:
+  - nvidia
   - conda-forge
   - defaults
 dependencies:
@@ -64,6 +65,10 @@ dependencies:
   - comm=0.1.4=pyhd8ed1ab_0
   - contourpy=1.2.0=py311h9547e67_0
   - cryptography=41.0.5=py311h63ff55d_0
+  - cuda-nvcc
+  - cuda-version
+  - cudatoolkit
+  - cudnn
   - cycler=0.12.1=pyhd8ed1ab_0
   - cytoolz=0.12.2=py311h459d7ec_1
   - dask=2023.10.1=pyhd8ed1ab_0
@@ -135,7 +140,7 @@ dependencies:
   - ipywidgets=8.1.1=pyhd8ed1ab_0
   - isoduration=20.11.0=pyhd8ed1ab_0
   - jax=0.4.19=pyhd8ed1ab_0
-  - jaxlib=0.4.19=cpu_py311h3b276bd_0
+  - jaxlib=0.4.19=*cuda*
   - jedi=0.19.1=pyhd8ed1ab_0
   - jinja2=3.1.2=pyhd8ed1ab_1
   - jmp=0.0.4=pyhd8ed1ab_0
@@ -251,6 +256,7 @@ dependencies:
   - nbconvert-core=7.11.0=pyhd8ed1ab_0
   - nbconvert-pandoc=7.11.0=pyhd8ed1ab_0
   - nbformat=5.9.2=pyhd8ed1ab_0
+  - nccl=2.19.4.1=h6103f9b_0
   - ncurses=6.4=h59595ed_2
   - nest-asyncio=1.5.8=pyhd8ed1ab_0
   - netcdf4=1.6.5=nompi_py311he8ad708_100
