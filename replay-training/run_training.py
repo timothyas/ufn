@@ -29,8 +29,10 @@ if __name__ == "__main__":
 
     inputs, targets, forcings = gufs.get_training_batches(
         xds=ds,
-        batch_indices=[0, 100, 200],
-        n_steps=1,
+        n_batches=20,
+        batch_size=1,
+        delta_t="6h",
+        target_lead_time="18h",
     )
     localtime.stop()
 

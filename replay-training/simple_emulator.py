@@ -9,7 +9,9 @@ Create and train a "simple" emulator:
 Purpose is to have the training pipeline working.
 """
 
+import warnings
 import dataclasses
+import pandas as pd
 import xarray as xr
 from jax import tree_util
 
@@ -99,30 +101,19 @@ class ReplayEmulator1Degree:
         ds.close()
 
 
-    def preprocess(self, xds, n_steps, batch_index=0):
-        """Prepare dataset for GraphCast
-
-        Note:
-            This assumes a 6 hour timestep with 3 hourly data because of the first line
-
-            >>> bds = xds.isel(time=slice(None, (n_steps+1)*2+1, 2))
-
-            which skips timesteps by 2
+    def preprocess(self, xds, batch_index=0):
+        """Prepare a single batch for GraphCast
 
         Args:
             xds (xarray.Dataset): with replay data
-            n_steps (int): number of timesteps made by the model during training
-            batch_index (int, optional): this index of this batch
+            batch_index (int, optional): the index of this batch
 
         Returns:
             bds (xarray.Dataset): this batch of data
         """
 
-        # slice out this batch from time
-        bds = xds.isel(time=slice(None, (n_steps+1)*2+1, 2))
-
         # select our vertical levels
-        bds = bds.sel(pfull=list(self.pressure_levels), method="nearest")
+        bds = xds.sel(pfull=list(self.pressure_levels), method="nearest")
 
         # only grab variables we care about
         myvars = list(x for x in self.all_variables if x in xds)
@@ -147,35 +138,97 @@ class ReplayEmulator1Degree:
         return bds
 
 
-    def get_training_batches(self, xds, batch_indices, n_steps):
+    def get_training_batches(self,
+        xds,
+        n_batches,
+        batch_size,
+        delta_t,
+        target_lead_time="6h"
+        ):
         """Get a dataset with all the batches of data necessary for training
 
         Note:
-            This uses :meth:`preprocess` and therefore assumes a 6 hour timestep
-            with 3 hourly data.
+            Here we're using target_lead_time as a single value, see graphcast.data_utils.extract ... where it could be multi valued but here I'm using it to compute the total time per batch so it's more useful this way
+
+        Note:
+            It's really unclear how the graphcast.data_utils.extract... function used in this method creates samples/batches... it's also unclear how optax expects the data in order to do minibatches.
 
         Args:
             xds (xarray.Dataset): the Replay dataset
-            batch_indices (list): with the time index of data to grab
-            n_steps (int): number of timesteps made by the model during training
+            n_batches (int): number of training batches to grab
+            batch_size (int): number of samples viewed per mini batch
+            delta_t (Timedeltalike): timestep of the desired emulator, e.g. "3h" or "6h"
+            target_lead_times (str or slice, optional): the lead time to use in the cost function, see graphcast.data_utils.extract_input_target_lead_times
 
         Returns:
             inputs, targets, forcings (xarray.Dataset): with new dimension "batch"
                 and appropriate fields for each dataset, based on the variables in :attr:`task_config`
+
+        Example:
+
+            Create training 100 batches, each batch has a single sample,
+            where each sample is made up of error from a 12h forecast,
+            where the emulator operates on 6 hour timesteps
+
+
+            >>> gufs = ReplayEmulator1Degree()
+            >>> xds = #... replay data
+            >>> inputs, targets, forcings = gufs.get_training_batches(
+                    xds=xds,
+                    n_batches=100,
+                    batch_size=1,
+                    delta_t="6h",
+                    target_lead_time="12h",
+                )
         """
 
         inputs = []
         targets = []
         forcings = []
-        for index in batch_indices:
-            batch = self.preprocess(
-                xds.isel(time=slice(index, index+(n_steps+1)*2+1)),
-                n_steps=n_steps,
-                batch_index=index,
+
+        if batch_size > 1:
+            warnings.warn("it's not clear how the batch/sample time slices are defined in graphcast or how they are used by optax")
+
+        delta_t = pd.Timedelta(delta_t)
+        input_duration = pd.Timedelta(self.input_duration)
+
+        time_per_sample = target_lead_time + input_duration
+        time_per_batch = batch_size * time_per_sample
+
+        # create a new time vector with desired delta_t
+        new_time = pd.date_range(
+            start=xds["time"].isel(time=0).values,
+            end=xds["time"].isel(time=-1).values,
+            freq=delta_t,
+            inclusive="both",
+        )
+        batch_initial_times = pd.date_range(
+            start=new_time[0],
+            end=new_time[-1],
+            freq=time_per_batch,
+            inclusive="both",
+        )
+        if n_batches > len(batch_initial_times)-1:
+            n_batches = len(batch_initial_times)-1
+            warnings.warn(f"There's less data than the number of batches requested, reducing n_batches to {n_batches}")
+
+        for i in range(n_batches):
+
+            timestamps_in_this_batch = pd.date_range(
+                start=batch_initial_times[i],
+                end=batch_initial_times[i+1],
+                freq=delta_t,
+                inclusive="both",
             )
+
+            batch = self.preprocess(
+                xds.sel(time=timestamps_in_this_batch),
+                batch_index=i,
+            )
+
             i, t, f = extract_inputs_targets_forcings(
                 batch,
-                target_lead_times=slice("6h", f"{n_steps*6}h"),
+                target_lead_times=target_lead_time,
                 **dataclasses.asdict(self.task_config),
             )
             inputs.append(i)
